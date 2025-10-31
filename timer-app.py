@@ -265,16 +265,19 @@ st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown('**Was möchtest du jetzt tun?**', unsafe_allow_html=True)
 c1,c2,c3,c4,c5 = st.columns(5)
 presets = [
-    ("✉️ E-Mails beantworten", 15*60),
-    ("📞 Telefonate planen", 10*60),
-    ("📖 Kapitel lesen", 25*60),
-    ("💡 Konzentriert arbeiten", 45*60),
-    ("🧘 Kurze Pause", 5*60),
+    ("✉️ E-Mails beantworten (15 min)", 15*60),
+    ("📞 Telefonate planen (10 min)", 10*60),
+    ("📖 Kapitel lesen (25 min)", 25*60),
+    ("💡 Konzentriert arbeiten (45 min)", 45*60),
+    ("🧘 Kurze Pause (5 min)", 5*60),
 ]
 for (label, secs), col in zip(presets, (c1,c2,c3,c4,c5)):
     if col.button(label, use_container_width=True):
         st.session_state.duration_sec = secs
-        st.session_state.desc = label.replace("✉️ ","").replace("📞 ","").replace("📖 ","").replace("💡 ","").replace("🧘 ","")
+        clean = label.replace("✉️ ","").replace("📞 ","").replace("📖 ","").replace("💡 ","").replace("🧘 ","")
+        if " (" in clean:
+            clean = clean.split(" (",1)[0]
+        st.session_state.desc = clean
         # Auto-Start bei Preset
         st.session_state.start_time = time.time()
         st.session_state.pause_accum = 0.0
@@ -415,7 +418,9 @@ def render_once():
         st.markdown(f'<div class="time">{int(remaining//60):02d}:{int(remaining%60):02d}</div>', unsafe_allow_html=True)
         st.markdown('<div class="progress"><div style="width:{:.2f}%"></div></div>'.format((1-pct)*100), unsafe_allow_html=True)
         st.markdown(f'<div class="meta"><span>{int(pct*100)}% verbleibend</span><span>•</span><span>{st.session_state.desc or "—"}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="quote">„{random.choice(QUOTES)}“</div>', unsafe_allow_html=True)
+        # rotate quotes every 20 seconds based on elapsed bucket
+        qidx = int((elapsed // 20) % len(QUOTES)) if len(QUOTES)>0 else 0
+        st.markdown(f'<div class="quote">„{QUOTES[qidx]}“</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with right_area.container():
