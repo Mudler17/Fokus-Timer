@@ -6,6 +6,7 @@ import base64
 import wave
 import numpy as np
 import streamlit as st
+from streamlit_extras.st_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Fokus-Timer", page_icon="⏳", layout="centered")
 
@@ -17,7 +18,6 @@ st.markdown('''
 .title { font-size:1.6rem; font-weight:700; }
 .subtle { color: var(--muted); }
 .pill { background: var(--pill); border-radius:999px; padding:.25rem .6rem; font-size:.9rem; }
-.controls { display:flex; gap:.5rem; }
 .grid { display:grid; grid-template-columns: 1fr 340px; gap:1.5rem; align-items:center; margin-top:1rem; }
 .timebox { text-align:center; }
 .time { font-size:6rem; font-weight:800; line-height:1; letter-spacing: .05em; }
@@ -104,10 +104,7 @@ with colR:
         st.session_state.paused_at = None
         st.session_state.running = True
         st.session_state.half_fired = False
-        if st.session_state.interval_min:
-            st.session_state.next_interval_sec = int(st.session_state.interval_min) * 60
-        else:
-            st.session_state.next_interval_sec = None
+        st.session_state.next_interval_sec = (int(st.session_state.interval_min)*60) if st.session_state.interval_min else None
         chime("tick", st.session_state.volume)
     if c2.button("Pause ⏸️", use_container_width=True):
         if st.session_state.running:
@@ -222,7 +219,8 @@ st.markdown('<div class="sandlabel">Sanduhr</div>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
+# Periodisch aktualisieren (ohne AttributeError)
 if st.session_state.running:
-    st.autorefresh(interval=200, key="tick")
+    st_autorefresh(interval=250, key="tick")
 
 st.markdown('<div class="footer">Hinweis: Ein Klick (Start) aktiviert akustische Signale im Browser.</div>', unsafe_allow_html=True)
