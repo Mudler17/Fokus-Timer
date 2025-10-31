@@ -1,28 +1,31 @@
 
 # app.py
+# Fokus‑Timer (Streamlit) — feste Ansicht, Sanduhr, aufgeräumtes UI
+# Abhängigkeiten: streamlit, numpy. KEIN streamlit-extras, KEIN matplotlib.
+
 import time
 from io import BytesIO
 import base64
 import wave
 import numpy as np
 import streamlit as st
-from streamlit_extras.st_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Fokus-Timer", page_icon="⏳", layout="centered")
 
+# ---------- CSS ----------
 st.markdown('''
 <style>
-:root { --fg: #111; --muted: #666; --pill: #f2f2f2; }
-.container { max-width: 920px; margin: 0 auto; }
+:root { --fg:#111; --muted:#666; --pill:#f2f2f2; }
+.container { max-width: 960px; margin: 0 auto; }
 .hgroup { display:flex; flex-direction:column; gap:.25rem; }
 .title { font-size:1.6rem; font-weight:700; }
 .subtle { color: var(--muted); }
 .pill { background: var(--pill); border-radius:999px; padding:.25rem .6rem; font-size:.9rem; }
-.grid { display:grid; grid-template-columns: 1fr 340px; gap:1.5rem; align-items:center; margin-top:1rem; }
+.grid { display:grid; grid-template-columns: 1fr 360px; gap:1.5rem; align-items:center; margin-top:1rem; }
 .timebox { text-align:center; }
-.time { font-size:6rem; font-weight:800; line-height:1; letter-spacing: .05em; }
+.time { font-size:6rem; font-weight:800; line-height:1; letter-spacing:.05em; }
 .progress { width:100%; height:10px; background:#eee; border-radius:6px; overflow:hidden; margin-top:.5rem; }
-.progress > div { height:100%; background: #4CAF50; }
+.progress > div { height:100%; background:#4CAF50; }
 .meta { display:flex; justify-content:center; gap:1rem; color:var(--muted); margin-top:.25rem; }
 .footer { text-align:center; color:var(--muted); margin-top:1rem; font-size:.9rem; }
 .sandwrap { display:flex; flex-direction:column; align-items:center; gap:.5rem; }
@@ -31,6 +34,7 @@ svg { display:block; }
 </style>
 ''', unsafe_allow_html=True)
 
+# ---------- Audio ----------
 def generate_tone(freq=880, duration=0.3, volume=0.5, waveform="sine", samplerate=44100):
     t = np.linspace(0, duration, int(samplerate * duration), False)
     if waveform == "sine":
@@ -69,6 +73,7 @@ def chime(kind="tick", volume=0.5):
         for f,d in ((523,0.22),(659,0.22),(784,0.28)):
             play_audio(generate_tone(f, d, volume, "sine"))
 
+# ---------- State ----------
 def init_state():
     ss = st.session_state
     defaults = dict(
@@ -78,18 +83,18 @@ def init_state():
         pause_accum=0.0,
         duration_sec=25*60,
         next_interval_sec=None,
-        half_fired=False,
-        desc="",
-        interval_min=None,
         halfway_signal=True,
+        half_fired=False,
+        interval_min=None,
         volume=0.5,
+        desc="",
     )
     for k,v in defaults.items():
         if k not in ss: ss[k]=v
 
 init_state()
 
-# Header mit Controls
+# ---------- Header & Controls ----------
 colL, colR = st.columns([0.65, 0.35])
 with colL:
     st.markdown('<div class="hgroup">', unsafe_allow_html=True)
@@ -152,6 +157,7 @@ with st.expander("Einstellungen", expanded=True):
 
     st.session_state.desc = st.text_input("Kurzbeschreibung", value=st.session_state.desc, placeholder="z. B. 'Kapitel lesen'")
 
+# ---------- Helpers ----------
 def get_elapsed():
     if st.session_state.start_time is None:
         return 0.0
@@ -161,24 +167,6 @@ def get_elapsed():
     else:
         paused = st.session_state.paused_at or now
         return paused - st.session_state.start_time - st.session_state.pause_accum
-
-total = st.session_state.duration_sec or 0
-elapsed = get_elapsed()
-remaining = max(0, total - elapsed)
-pct = 0 if total == 0 else max(0, min(1, remaining/total))
-
-# Töne
-if st.session_state.running and total > 0:
-    if st.session_state.halfway_signal and not st.session_state.half_fired and elapsed >= total/2:
-        chime("half", st.session_state.volume)
-        st.session_state.half_fired = True
-    if st.session_state.next_interval_sec is not None and elapsed >= st.session_state.next_interval_sec and remaining > 0:
-        chime("tick", st.session_state.volume)
-        st.session_state.next_interval_sec += int(st.session_state.interval_min) * 60
-if remaining <= 0.01 and st.session_state.start_time is not None:
-    if st.session_state.running:
-        chime("end", st.session_state.volume)
-    st.session_state.running = False
 
 def hourglass_svg(pct_remaining: float) -> str:
     width, height = 160, 240
@@ -205,22 +193,53 @@ def hourglass_svg(pct_remaining: float) -> str:
 '''
     return svg
 
-st.markdown('<div class="grid">', unsafe_allow_html=True)
-# Timer (links)
-st.markdown('<div class="timebox">', unsafe_allow_html=True)
-st.markdown(f'<div class="time">{int(remaining//60):02d}:{int(remaining%60):02d}</div>', unsafe_allow_html=True)
-st.markdown('<div class="progress"><div style="width:{:.2f}%"></div></div>'.format((1-pct)*100), unsafe_allow_html=True)
-st.markdown(f'<div class="meta"><span>{int(pct*100)}% verbleibend</span><span>•</span><span>{st.session_state.desc or "—"}</span></div>', unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
-# Sanduhr (rechts)
-st.markdown('<div class="sandwrap">', unsafe_allow_html=True)
-st.markdown(hourglass_svg(pct), unsafe_allow_html=True)
-st.markdown('<div class="sandlabel">Sanduhr</div>', unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
+# ---------- Fixed layout placeholders ----------
+left_col, right_col = st.columns([1, 1])
+left_area = left_col.empty()
+right_area = right_col.empty()
 
-# Periodisch aktualisieren (ohne AttributeError)
+def render_once():
+    total = st.session_state.duration_sec or 0
+    elapsed = get_elapsed()
+    remaining = max(0, total - elapsed)
+    pct = 0 if total == 0 else max(0, min(1, remaining/total))
+
+    # Signals
+    if st.session_state.running and total > 0:
+        if st.session_state.halfway_signal and not st.session_state.half_fired and elapsed >= total/2:
+            chime("half", st.session_state.volume)
+            st.session_state.half_fired = True
+        if st.session_state.next_interval_sec is not None and elapsed >= st.session_state.next_interval_sec and remaining > 0:
+            chime("tick", st.session_state.volume)
+            st.session_state.next_interval_sec += int(st.session_state.interval_min) * 60
+    if remaining <= 0.01 and st.session_state.start_time is not None:
+        if st.session_state.running:
+            chime("end", st.session_state.volume)
+        st.session_state.running = False
+
+    with left_area.container():
+        st.markdown('<div class="timebox">', unsafe_allow_html=True)
+        st.markdown(f'<div class="time">{int(remaining//60):02d}:{int(remaining%60):02d}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="progress"><div style="width:{:.2f}%"></div></div>'.format((1-pct)*100), unsafe_allow_html=True)
+        st.markdown(f'<div class="meta"><span>{int(pct*100)}% verbleibend</span><span>•</span><span>{st.session_state.desc or "—"}</span></div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with right_area.container():
+        st.markdown('<div class="sandwrap">', unsafe_allow_html=True)
+        st.markdown(hourglass_svg(pct), unsafe_allow_html=True)
+        st.markdown('<div class="sandlabel">Sanduhr</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# Initial render
+render_once()
+
+# Live update in-place (keine neuen Fenster)
 if st.session_state.running:
-    st_autorefresh(interval=250, key="tick")
+    # Sanfter Loop in genau EINEM fest zugewiesenen Platz
+    # (verlässt den Loop, wenn pausiert/gestoppt)
+    while st.session_state.running:
+        time.sleep(0.2)
+        render_once()
+        # Stoppt automatisch, wenn Zeit <= 0 in render_once() gesetzt wurde
 
-st.markdown('<div class="footer">Hinweis: Ein Klick (Start) aktiviert akustische Signale im Browser.</div>', unsafe_allow_html=True)
+st.markdown('<div class="footer">Tipp: Autoplay kann blockiert sein — einmal klicken (Start) aktiviert Töne.</div>', unsafe_allow_html=True)
